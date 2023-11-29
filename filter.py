@@ -13,18 +13,22 @@ r = open("cross_references.txt", "r")
 count = 0
 referenceCount = 0
 r.readline()
-for l in r.readlines():
-    spl = l.strip().split("\t")
+
+for line in r.readlines():
+    spl = line.strip().split("\t")
     fromPassage, toPassage, votes = spl[0], spl[1], int(spl[2])
 
-    # filter out whole passages from cross references, only use first verse of reference destination
+    # filter out whole passages from cross references, only use first verse of
+    # reference destination
     to = helpers.parseOsisPassage(toPassage)
-
+    tbk = to['book']
+    tchptr = to['chapter']
+    referenceFormat = f"{fromPassage}\t{tbk}.{tchptr}.{to['verse']}\t{votes}\n"
     # add reference
     if votes >= minVotes:
-        referenceList.append(f"{fromPassage}\t{to['book']}.{to['chapter']}.{to['verse']}\t{votes}\n")
+        referenceList.append(referenceFormat)
         referenceCount += 1
-    
+
     count += 1
     if count >= limit or referenceCount >= referenceLimit:
         break
@@ -32,7 +36,7 @@ for l in r.readlines():
 r.close()
 
 # write csv
-c = open("build/cross_references_filtered.csv","w")
+c = open("build/cross_references_filtered.csv", "w")
 for r in referenceList:
     c.write(r)
 c.close()

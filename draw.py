@@ -11,7 +11,7 @@ referencesFile = "build/cross_references_filtered.csv"
 sortedReferencesFile = "build/cross_references_sorted.json"
 outputImageFile = "references.png"
 
-#screen_width, screen_height = 2560, 1536
+# screen_width, screen_height = 2560, 1536
 screen_width, screen_height = 12000, 7200
 margin = 55
 headless = True
@@ -26,6 +26,7 @@ lineWidth = 0.25
 
 chapterIndexCache = {}
 
+
 def getChapterIndex(chapters, osisID):
     global chapterIndexCache
     # add to cache if not already in
@@ -37,14 +38,15 @@ def getChapterIndex(chapters, osisID):
         return -1
     return chapterIndexCache[osisID]
 
+
 def getInsertIndex(arcs, offset, distance):
     count = len(arcs)
     if count > 1:
         middle = count // 2
         refDistance = arcs[middle]['refDistance']
-        if abs(distance) <= abs(refDistance): # left half
+        if abs(distance) <= abs(refDistance):  # left half
             half = arcs[:middle]
-        else: # right half
+        else:  # right half
             half = arcs[middle:]
             offset = offset + middle
         index = getInsertIndex(half, offset, distance)
@@ -53,23 +55,24 @@ def getInsertIndex(arcs, offset, distance):
             return offset
         else:
             return offset + 1
-    
+
     return index
+
 
 def buildArcData(sortedReferencesFile, chapters):
     print("Calculating arc data ...")
     # try to load sorted references from file
-    try: 
+    try:
         print("Read arc data from json file ...")
         jFile = open(sortedReferencesFile)
         arcs = json.load(jFile)
         jFile.close()
     # Read references from unsorted csv file
-    except:
+    except FileNotFoundError:
         print("An error occurred while reading arc data. Recalculating ...")
         referencesFileHandle = open(referencesFile)
         referencesCsv = csv.reader(referencesFileHandle, delimiter="\t")
-        references = [ row for row in referencesCsv ]
+        references = [row for row in referencesCsv]
         referencesFileHandle.close()
 
         arcs = []
@@ -80,14 +83,18 @@ def buildArcData(sortedReferencesFile, chapters):
             ref = helpers.parseReference(r)
             fromPos = getChapterIndex(chapters, ref['from']['bookChapter'])
             toPos = getChapterIndex(chapters, ref['to']['bookChapter'])
-            
+
             # filter cross references to non-existent chapters (e.g. Mal.4)
             if fromPos == -1 or toPos == -1:
-                print(f"Warning: Chapter does not exist in reference {ref['from']['bookChapter']} → {ref['to']['bookChapter']}")
+                print(f"Warning: Chapter does not exist in reference \
+                    {ref['from']['bookChapter']} → {ref['to']['bookChapter']}")
                 continue
             refDistance = toPos - fromPos
 
-            arcData = { 'from': ref['from'], 'to': ref['to'], 'fromPos': fromPos, 'toPos': toPos, 'refDistance': refDistance }
+            arcData = {'from': ref['from'], 'to': ref['to'],
+                       'fromPos': fromPos, 'toPos': toPos,
+                       'refDistance': refDistance
+                       }
 
             # insert sorted, ascending by refDistance
             pos = getInsertIndex(arcs, 0, refDistance)
@@ -96,9 +103,9 @@ def buildArcData(sortedReferencesFile, chapters):
             readCount += 1
             if readCount >= readLimit:
                 break
-        
+
         print(f"Found {readCount} cross references.")
-    
+
         # write sorted references to json
         print("Write data to json file …")
         jFileHandle = open(sortedReferencesFile, "w")
@@ -112,30 +119,35 @@ def drawArcs(chapters):
     chapterWidth = (screen_width - 2 * margin) / chapterCount
     centerY = int(screen_width / 2 + 0.75 * margin)
 
-
-    ### calculate reference arc data ###
+    # calculate reference arc data ###
     arcs = buildArcData(sortedReferencesFile, chapters)
 
-    ### draw arcs ###
+    # draw arcs ###
     print("Draw arcs ...")
-    #arcs.reverse() # remove comment to draw widest arcs first instead of narrowest arcs
+    # remove comment in next line to draw widest arcs first instead of
+    # narrowest arcs
+    # arcs.reverse()
     drawCount = 0
     duplicateCount = 0
     eg.set_line_width(lineWidth)
-    
+
     prevArc = None
     for i in range(len(arcs)):
         arc = arcs[i]
 
         # ignore chapter wise duplicates?
-        if prevArc != None and prevArc['from']['bookChapter'] == arc['from']['bookChapter'] and prevArc['to']['bookChapter'] == arc['to']['bookChapter']:
+        if prevArc is not None and \
+                prevArc['from']['bookChapter'] == arc['from']['bookChapter'] \
+                and prevArc['to']['bookChapter'] == arc['to']['bookChapter']:
             duplicateCount += 1
-            #print("Ignore duplicate")
-            #continue
+            # print("Ignore duplicate")
+            # continue
 
         if abs(arc['refDistance']) > 0:
             # color
-            color = eg.color_hsv((int(abs(arc['refDistance']) / chapterCount * 720) + hueShift) % 360, saturation, value, alpha)
+            hue = (int(abs(arc['refDistance']) / chapterCount * 720) +
+                   hueShift) % 360
+            color = eg.color_hsv(hue, saturation, value, alpha)
             eg.set_color(color)
 
             # position and size
@@ -148,11 +160,12 @@ def drawArcs(chapters):
             eg.arc(centerX, centerY, 0, 180, radians, radians)
 
             drawCount += 1
-        
+
         prevArc = arc
         if drawCount >= drawLimit:
             break
     print(f"Drew {drawCount} arcs, found {duplicateCount} duplicates.")
+
 
 def drawChapters(chapters):
     print("Draw chapters ...")
@@ -176,8 +189,10 @@ def drawChapters(chapters):
 
         eg.set_fill_color(color)
         x = getChapterIndex(chapters, chapter[0]) * chapterWidth + margin
-        chapterHeight = int(chapter[1] / 176 * chapterMaxHeight) # 176 verses → Psalm 119
+        # 176 verses → Psalm 119
+        chapterHeight = int(chapter[1] / 176 * chapterMaxHeight)
         eg.fill_rect(x + 1, y, x + chapterWidth - 1, y + chapterHeight)
+
 
 def main():
     # read chapter info
@@ -189,10 +204,10 @@ def main():
             chapters.append((row[0], int(row[1])))
     chaptersFileHandle.close()
 
-    eg.init_graph(screen_width, screen_height, headless = headless)
+    eg.init_graph(screen_width, screen_height, headless=headless)
     # fill background
     eg.set_fill_color(eg.Color.BLACK)
-    eg.fill_rect(0,0,screen_width,screen_height)
+    eg.fill_rect(0, 0, screen_width, screen_height)
     # draw arcs
     drawArcs(chapters)
     # draw chapters
@@ -202,5 +217,6 @@ def main():
     print("Save image ...")
     eg.save_image(outputImageFile)
     eg.close_graph()
+
 
 eg.easy_run(main)
